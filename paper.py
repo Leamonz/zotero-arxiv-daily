@@ -56,23 +56,28 @@ class ArxivPaper:
         retries = Retry(total=5, backoff_factor=0.1)
         s.mount('https://', HTTPAdapter(max_retries=retries))
         try:
-            paper_list = s.get(f'https://paperswithcode.com/api/v1/papers/?arxiv_id={self.arxiv_id}').json()
+            response = s.get(
+                f"https://huggingface.co/api/papers/{self.arxiv_id}",
+                timeout=15,
+            )
         except Exception as e:
             logger.debug(f'Error when searching {self.arxiv_id}: {e}')
             return None
 
-        if paper_list.get('count',0) == 0:
+        if response.status_code == 404:
             return None
-        paper_id = paper_list['results'][0]['id']
 
         try:
-            repo_list = s.get(f'https://paperswithcode.com/api/v1/papers/{paper_id}/repositories/').json()
+            response.raise_for_status()
+            paper_info = response.json()
         except Exception as e:
             logger.debug(f'Error when searching {self.arxiv_id}: {e}')
             return None
-        if repo_list.get('count',0) == 0:
+
+        github_repo = paper_info.get("githubRepo")
+        if not github_repo:
             return None
-        return repo_list['results'][0]['url']
+        return github_repo
     
     @cached_property
     def tex(self) -> dict[str,str]:
